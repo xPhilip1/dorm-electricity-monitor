@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}抓取日志 - 宿舍电费监控{% endblock %}
+{% block content %}
+
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div><h5>电费监控</h5><small>Dorm Power Monitor</small></div>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('index') }}" class="nav-item"><i class="bi bi-grid-1x2-fill"></i> 监控面板</a>
+        <a href="{{ url_for('settings') }}" class="nav-item"><i class="bi bi-gear-fill"></i> 个人设置</a>
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('admin_users') }}" class="nav-item"><i class="bi bi-people-fill"></i> 用户管理</a>
+        <a href="{{ url_for('admin_config') }}" class="nav-item"><i class="bi bi-sliders2"></i> 系统配置</a>
+        <a href="{{ url_for('admin_logs') }}" class="nav-item active"><i class="bi bi-journal-text"></i> 抓取日志</a>
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar">{{ current_user.username[0] | upper }}</div>
+        <div class="user-info">
+            <div class="user-name">{{ current_user.username }}</div>
+            <div class="user-role">管理员</div>
+        </div>
+        <a href="{{ url_for('logout') }}" title="退出登录" style="color:var(--text-muted);font-size:18px;"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+</aside>
+
+<div class="main-content">
+    <div class="topbar">
+        <h4><i class="bi bi-journal-text me-2" style="color:var(--accent-blue)"></i>抓取日志</h4>
+    </div>
+    <div class="content-area">
+        <div class="card-dark">
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>宿舍</th>
+                            <th>结果</th>
+                            <th>耗时</th>
+                            <th>错误信息</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in pagination.items %}
+                        <tr>
+                            <td style="font-size:12px;">{{ log.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+                            <td>{{ log.dorm_room }}</td>
+                            <td>
+                                {% if log.success %}
+                                <span class="status-badge normal">成功</span>
+                                {% else %}
+                                <span class="status-badge critical">失败</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.duration_ms }}ms</td>
+                            <td style="color:var(--text-muted);font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ log.error_msg or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:30px;">暂无日志</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            {% if pagination.pages > 1 %}
+            <nav style="margin-top:16px;">
+                <ul class="pagination pagination-sm" style="gap:4px;">
+                    {% if pagination.has_prev %}
+                    <li><a class="btn btn-sm" style="background:var(--bg-primary);color:var(--text-secondary);border:1px solid var(--border-color);" href="{{ url_for('admin_logs', page=pagination.prev_num) }}">上一页</a></li>
+                    {% endif %}
+                    <li><span style="font-size:13px;color:var(--text-muted);padding:6px 12px;">第 {{ pagination.page }} / {{ pagination.pages }} 页</span></li>
+                    {% if pagination.has_next %}
+                    <li><a class="btn btn-sm" style="background:var(--bg-primary);color:var(--text-secondary);border:1px solid var(--border-color);" href="{{ url_for('admin_logs', page=pagination.next_num) }}">下一页</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>setTimeout(() => document.querySelectorAll('.flash-msg').forEach(el => el.remove()), 3000);</script>
+{% endblock %}

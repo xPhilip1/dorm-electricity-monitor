@@ -1,0 +1,63 @@
+server:
+  host: 127.0.0.1
+  port: 5000
+  debug: true
+  secret_key: "CHANGE_ME_请换成自己的随机字符串"   # 生成: openssl rand -hex 32
+database:
+  type: sqlite
+  path: data/dorm_electricity.db
+alipay:
+  mode: api
+  api_base: ''
+  query_path: ''
+  method: POST
+  body_style: form
+  room_params:
+    areaId: ''
+    buildingId: ''
+    roomId: '{room}'
+  auth_header: Authorization
+  auth_style: bearer
+  auth_token: ''
+  balance_field: data.surplus
+  unit: 度
+  browser:
+    page_url: ''
+    balance_selector: ''
+    headless: true
+    channel: msedge
+changgong:
+  ali_user_id: ''                  # 填自己的支付宝用户 ID（2088 开头），获取方法见 README
+monitor:
+  interval_minutes: 30
+  alert_threshold: 20
+  alert_levels:
+    warning:
+      threshold: 20
+      color: '#f0ad4e'
+    urgent:
+      threshold: 10
+      color: '#fd7e14'
+    critical:
+      threshold: 5
+      color: '#dc3545'
+  max_fail_count: 3
+notification:
+  serverchan:
+    enabled: false
+    sendkey: ''
+  email:
+    enabled: false
+    smtp_server: smtp.qq.com
+    smtp_port: 465
+    smtp_user: ''
+    smtp_password: ''
+    receivers: []
+  wecom_bot:
+    enabled: false
+    webhook_url: ''
+logging:
+  level: INFO
+  file: logs/app.log
+  max_size_mb: 10
+  backup_count: 5

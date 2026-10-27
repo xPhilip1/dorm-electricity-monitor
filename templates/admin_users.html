@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}用户管理 - 宿舍电费监控{% endblock %}
+{% block content %}
+
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div><h5>电费监控</h5><small>Dorm Power Monitor</small></div>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('index') }}" class="nav-item"><i class="bi bi-grid-1x2-fill"></i> 监控面板</a>
+        <a href="{{ url_for('settings') }}" class="nav-item"><i class="bi bi-gear-fill"></i> 个人设置</a>
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('admin_users') }}" class="nav-item active"><i class="bi bi-people-fill"></i> 用户管理</a>
+        <a href="{{ url_for('admin_config') }}" class="nav-item"><i class="bi bi-sliders2"></i> 系统配置</a>
+        <a href="{{ url_for('admin_logs') }}" class="nav-item"><i class="bi bi-journal-text"></i> 抓取日志</a>
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar">{{ current_user.username[0] | upper }}</div>
+        <div class="user-info">
+            <div class="user-name">{{ current_user.username }}</div>
+            <div class="user-role">管理员</div>
+        </div>
+        <a href="{{ url_for('logout') }}" title="退出登录" style="color:var(--text-muted);font-size:18px;"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+</aside>
+
+<div class="main-content">
+    <div class="topbar">
+        <h4><i class="bi bi-people-fill me-2" style="color:var(--accent-blue)"></i>用户管理</h4>
+    </div>
+    <div class="content-area">
+        <!-- 新增用户 -->
+        <div class="card-dark">
+            <h6 style="font-size:15px;font-weight:600;margin-bottom:16px;">
+                <i class="bi bi-person-plus me-2" style="color:var(--accent-green)"></i>创建新用户
+            </h6>
+            <form method="POST" action="{{ url_for('admin_create_user') }}" class="row g-2 align-items-end">
+                <div class="col-auto"><input type="text" name="username" class="form-control form-control-dark" placeholder="用户名" required></div>
+                <div class="col-auto"><input type="password" name="password" class="form-control form-control-dark" placeholder="密码" required></div>
+                <div class="col-auto"><input type="text" name="dorm_room" class="form-control form-control-dark" placeholder="宿舍号" required></div>
+                <div class="col-auto">
+                    <select name="role" class="form-select form-select-dark">
+                        <option value="member">普通成员</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+                <div class="col-auto"><button type="submit" class="btn btn-primary-custom btn-sm">创建</button></div>
+            </form>
+        </div>
+
+        <!-- 用户列表 -->
+        <div class="card-dark">
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户名</th>
+                            <th>角色</th>
+                            <th>宿舍号</th>
+                            <th>学校账号</th>
+                            <th>最后登录</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td><strong>{{ user.username }}</strong></td>
+                            <td>
+                                <span class="status-badge {{ 'normal' if user.role == 'admin' else 'unknown' }}">
+                                    {{ '管理员' if user.role == 'admin' else '成员' }}
+                                </span>
+                            </td>
+                            <td>{{ user.dorm_room }}</td>
+                            <td>{{ user.campus_account or '-' }}</td>
+                            <td style="color:var(--text-muted);font-size:12px;">{{ user.last_login.strftime('%m-%d %H:%M') if user.last_login else '-' }}</td>
+                            <td>
+                                {% if user.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('admin_delete_user', uid=user.id) }}" style="display:inline;"
+                                      onsubmit="return confirm('确定删除用户 {{ user.username }} 吗？');">
+                                    <button type="submit" class="btn btn-danger-custom">删除</button>
+                                </form>
+                                {% else %}
+                                <span style="color:var(--text-muted);font-size:12px;">当前用户</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>setTimeout(() => document.querySelectorAll('.flash-msg').forEach(el => el.remove()), 3000);</script>
+{% endblock %}

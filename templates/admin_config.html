@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}系统配置 - 宿舍电费监控{% endblock %}
+{% block content %}
+
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div><h5>电费监控</h5><small>Dorm Power Monitor</small></div>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('index') }}" class="nav-item"><i class="bi bi-grid-1x2-fill"></i> 监控面板</a>
+        <a href="{{ url_for('settings') }}" class="nav-item"><i class="bi bi-gear-fill"></i> 个人设置</a>
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('admin_users') }}" class="nav-item"><i class="bi bi-people-fill"></i> 用户管理</a>
+        <a href="{{ url_for('admin_config') }}" class="nav-item active"><i class="bi bi-sliders2"></i> 系统配置</a>
+        <a href="{{ url_for('admin_logs') }}" class="nav-item"><i class="bi bi-journal-text"></i> 抓取日志</a>
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar">{{ current_user.username[0] | upper }}</div>
+        <div class="user-info">
+            <div class="user-name">{{ current_user.username }}</div>
+            <div class="user-role">管理员</div>
+        </div>
+        <a href="{{ url_for('logout') }}" title="退出登录" style="color:var(--text-muted);font-size:18px;"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+</aside>
+
+<div class="main-content">
+    <div class="topbar">
+        <h4><i class="bi bi-sliders2 me-2" style="color:var(--accent-blue)"></i>系统配置</h4>
+    </div>
+    <div class="content-area">
+        <div class="card-dark">
+            <h6 style="font-size:15px;font-weight:600;margin-bottom:20px;">
+                <i class="bi bi-toggles me-2" style="color:var(--accent-yellow)"></i>监控参数
+            </h6>
+            <form method="POST">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label-dark">采集间隔（分钟）</label>
+                        <input type="number" name="cfg_monitor_interval" class="form-control form-control-dark"
+                               value="{{ configs | selectattr('key', 'equalto', 'monitor_interval') | map(attribute='value') | first | default('30') }}" min="5" max="1440">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label-dark">普通告警阈值（元）</label>
+                        <input type="number" name="cfg_alert_level_warning" class="form-control form-control-dark" step="0.1"
+                               value="{{ configs | selectattr('key', 'equalto', 'alert_level_warning') | map(attribute='value') | first | default('20') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label-dark">紧急告警阈值（元）</label>
+                        <input type="number" name="cfg_alert_level_urgent" class="form-control form-control-dark" step="0.1"
+                               value="{{ configs | selectattr('key', 'equalto', 'alert_level_urgent') | map(attribute='value') | first | default('10') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label-dark">严重告警阈值（元）</label>
+                        <input type="number" name="cfg_alert_level_critical" class="form-control form-control-dark" step="0.1"
+                               value="{{ configs | selectattr('key', 'equalto', 'alert_level_critical') | map(attribute='value') | first | default('5') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label-dark">连续失败次数后标记未知</label>
+                        <input type="number" name="cfg_max_fail_count" class="form-control form-control-dark"
+                               value="{{ configs | selectattr('key', 'equalto', 'max_fail_count') | map(attribute='value') | first | default('3') }}" min="1">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary-custom w-100">
+                            <i class="bi bi-check-lg me-1"></i> 保存配置
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="card-dark mt-3">
+            <h6 style="font-size:15px;font-weight:600;margin-bottom:12px;">
+                <i class="bi bi-info-circle me-2" style="color:var(--accent-blue)"></i>配置说明
+            </h6>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:2;">
+                <p><strong>采集间隔</strong>：两次自动查询之间的等待时间，建议 30~60 分钟，太频繁可能触发学校服务器反爬。</p>
+                <p><strong>分级告警</strong>：当余额低于对应阈值时触发相应等级的通知。</p>
+                <p style="color:var(--text-muted);font-size:12px;">注意：通知渠道（Server酱、邮件等）请在 config/config.yaml 中配置。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>setTimeout(() => document.querySelectorAll('.flash-msg').forEach(el => el.remove()), 3000);</script>
+{% endblock %}

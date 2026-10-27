@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - 宿舍电费监控{% endblock %}
+{% block content %}
+
+<!-- 侧边栏 -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div>
+            <h5>电费监控</h5>
+            <small>Dorm Power Monitor</small>
+        </div>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('index') }}" class="nav-item active">
+            <i class="bi bi-grid-1x2-fill"></i> 监控面板
+        </a>
+        <a href="{{ url_for('settings') }}" class="nav-item">
+            <i class="bi bi-gear-fill"></i> 个人设置
+        </a>
+        {% if current_user.role == 'admin' %}
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('admin_users') }}" class="nav-item">
+            <i class="bi bi-people-fill"></i> 用户管理
+        </a>
+        <a href="{{ url_for('admin_config') }}" class="nav-item">
+            <i class="bi bi-sliders2"></i> 系统配置
+        </a>
+        <a href="{{ url_for('admin_logs') }}" class="nav-item">
+            <i class="bi bi-journal-text"></i> 抓取日志
+        </a>
+        {% endif %}
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar">{{ current_user.username[0] | upper }}</div>
+        <div class="user-info">
+            <div class="user-name">{{ current_user.username }}</div>
+            <div class="user-role">{{ '管理员' if current_user.role == 'admin' else '成员' }}</div>
+        </div>
+        <a href="{{ url_for('logout') }}" title="退出登录" style="color:var(--text-muted);font-size:18px;">
+            <i class="bi bi-box-arrow-right"></i>
+        </a>
+    </div>
+</aside>
+
+<!-- 主内容 -->
+<div class="main-content">
+    <div class="topbar">
+        <h4><i class="bi bi-grid-1x2-fill me-2" style="color:var(--accent-blue)"></i>监控面板</h4>
+        <div class="d-flex align-items-center gap-3">
+            {% if rooms %}
+            <select id="roomSelect" class="form-select form-select-dark" style="width:160px;">
+                {% for (room,) in rooms %}
+                <option value="{{ room }}" {{ 'selected' if room == selected_room }}>{{ room }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button id="btnTrigger" class="btn btn-primary-custom btn-sm">
+                <i class="bi bi-arrow-repeat me-1"></i> 立即查询
+            </button>
+            <span id="triggerStatus" style="font-size:12px;color:var(--text-muted);"></span>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <!-- 统计卡片 -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="stat-card stat-balance">
+                    <div class="stat-icon"><i class="bi bi-wallet2"></i></div>
+                    <div class="stat-value" id="balanceValue">--</div>
+                    <div class="stat-label">当前可用 ({{ elec_unit }})</div>
+                    <div id="balanceBreakdown" style="font-size:11px;color:var(--text-muted);margin-top:2px;"></div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card stat-usage">
+                    <div class="stat-icon"><i class="bi bi-lightning"></i></div>
+                    <div class="stat-value" id="usageValue">--</div>
+                    <div class="stat-label">预估日消耗 ({{ elec_unit }}/天)</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card stat-days">
+                    <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+                    <div class="stat-value" id="daysValue">--</div>
+                    <div class="stat-label">预计可用天数</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card stat-alert">
+                    <div class="stat-icon"><i class="bi bi-bell"></i></div>
+                    <div class="stat-value" id="alertCount">{{ recent_alerts | selectattr('is_recovered', 'equalto', false) | list | length }}</div>
+                    <div class="stat-label">未恢复告警</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 手动记录 -->
+        <div class="card-dark" style="padding:14px 20px;">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto" style="font-size:13px;color:var(--text-secondary);">
+                    <i class="bi bi-pencil-square me-1" style="color:var(--accent-yellow)"></i>
+                    手动记录当前剩余 ({{ elec_unit }}):
+                </div>
+                <div class="col-auto">
+                    <input id="manualBalance" type="number" step="0.01" min="0"
+                           class="form-control form-control-dark" style="width:130px;"
+                           placeholder="输入数字">
+                </div>
+                <div class="col-auto">
+                    <button id="btnManual" class="btn btn-primary-custom btn-sm">保存并判断告警</button>
+                </div>
+                <div class="col-auto">
+                    <span id="manualStatus" style="font-size:12px;color:var(--text-muted);"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表 + 告警 -->
+        <div class="row g-3 mt-1">
+            <div class="col-lg-8">
+                <div class="card-dark">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="card-title mb-0">剩余趋势（近 7 天）</div>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm" style="background:var(--bg-primary);color:var(--text-secondary);border:1px solid var(--border-color);font-size:12px;" onclick="loadChart(7)">7天</button>
+                            <button class="btn btn-sm" style="background:var(--bg-primary);color:var(--text-secondary);border:1px solid var(--border-color);font-size:12px;" onclick="loadChart(30)">30天</button>
+                        </div>
+                    </div>
+                    <div id="chartContainer" style="height:320px;"></div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card-dark" style="height:100%;">
+                    <div class="card-title">最近告警</div>
+                    {% if recent_alerts %}
+                        {% for alert in recent_alerts %}
+                        <div class="alert-item">
+                            <div class="alert-dot {{ alert.level }}"></div>
+                            <div>
+                                <div style="font-size:13px;">剩余 <strong>{{ '%.2f' | format(alert.balance) }}</strong> {{ elec_unit }}
+                                    {% if alert.is_recovered %}
+                                        <span class="status-badge normal" style="font-size:10px;padding:2px 6px;">已恢复</span>
+                                    {% endif %}
+                                </div>
+                                <div class="alert-msg">{{ alert.channel or '' }}</div>
+                                <div class="alert-time">{{ alert.created_at.strftime('%m-%d %H:%M') }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:13px;">
+                            <i class="bi bi-check-circle" style="font-size:32px;display:block;margin-bottom:8px;color:var(--accent-green);"></i>
+                            暂无告警，一切正常
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 最近查询记录 -->
+        <div class="card-dark mt-3">
+            <div class="card-title">最近查询记录</div>
+            <div class="table-responsive">
+                <table class="table-dark-custom">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>宿舍</th>
+                            <th>购电 ({{ elec_unit }})</th>
+                            <th>补助 ({{ elec_unit }})</th>
+                            <th>当日用电 (度)</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in week_records[-10:] | reverse %}
+                        <tr>
+                            <td>{{ record.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+                            <td>{{ record.dorm_room }}</td>
+                            <td><strong>{{ '%.2f' | format(record.balance) }}</strong>
+                                {% if record.raw_data == 'manual' %}
+                                <span class="status-badge unknown" style="font-size:10px;padding:1px 6px;margin-left:4px;">手动</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ '%.2f' | format(record.subsidy or 0) }}</td>
+                            <td>{{ '%.2f' | format(record.usage_today) }}</td>
+                            <td><span class="status-badge {{ record.status }}">{{ record.status }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:30px;">暂无数据，请先配置学校账号并启动监控</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ECharts -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+    const chart = echarts.init(document.getElementById('chartContainer'), null, { renderer: 'canvas' });
+    let currentRoom = '{{ selected_room }}';
+    const ELEC_UNIT = '{{ elec_unit }}';
+    const THRESHOLDS = { warning: {{ thresholds.warning }}, urgent: {{ thresholds.urgent }}, critical: {{ thresholds.critical }} };
+
+    function getStatusColor(status) {
+        const colors = { normal: '#34d399', warning: '#fbbf24', urgent: '#fb923c', critical: '#f87171', unknown: '#6c757d' };
+        return colors[status] || '#4a8eff';
+    }
+
+    function loadChart(days = 7) {
+        fetch(`/api/history?room=${encodeURIComponent(currentRoom)}&days=${days}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.length) {
+                    chart.setOption({
+                        title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#5a5f72', fontSize: 14 } },
+                        xAxis: { show: false }, yAxis: { show: false }, series: []
+                    });
+                    return;
+                }
+
+                const option = {
+                    tooltip: {
+                        trigger: 'axis',
+                        backgroundColor: '#1e2233',
+                        borderColor: '#2d3348',
+                        textStyle: { color: '#e4e6f0', fontSize: 12 },
+                        formatter: p => `${p[0].axisValue}<br/>剩余: <strong>${p[0].value} ${ELEC_UNIT}</strong>`
+                    },
+                    grid: { left: 50, right: 20, top: 20, bottom: 30 },
+                    xAxis: {
+                        type: 'category',
+                        data: data.map(d => d.time),
+                        axisLine: { lineStyle: { color: '#2d3348' } },
+                        axisLabel: { color: '#5a5f72', fontSize: 11 }
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: ELEC_UNIT,
+                        nameTextStyle: { color: '#5a5f72' },
+                        axisLine: { show: false },
+                        splitLine: { lineStyle: { color: '#1e2233' } },
+                        axisLabel: { color: '#5a5f72', fontSize: 11 }
+                    },
+                    series: [
+                        {
+                            type: 'line',
+                            data: data.map(d => d.balance),
+                            smooth: true,
+                            symbol: 'circle',
+                            symbolSize: 6,
+                            lineStyle: { width: 2.5, color: '#4a8eff' },
+                            itemStyle: { color: '#4a8eff' },
+                            areaStyle: {
+                                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                    { offset: 0, color: 'rgba(74,142,255,0.25)' },
+                                    { offset: 1, color: 'rgba(74,142,255,0.02)' }
+                                ])
+                            },
+                            markLine: {
+                                silent: true,
+                                data: [
+                                    { yAxis: THRESHOLDS.warning, label: { formatter: '告警线 ' + THRESHOLDS.warning + ELEC_UNIT, color: '#fbbf24', fontSize: 11 }, lineStyle: { color: '#fbbf24', type: 'dashed' } },
+                                    { yAxis: THRESHOLDS.urgent, label: { formatter: THRESHOLDS.urgent + ELEC_UNIT, color: '#fb923c', fontSize: 11 }, lineStyle: { color: '#fb923c', type: 'dashed' } },
+                                    { yAxis: THRESHOLDS.critical, label: { formatter: THRESHOLDS.critical + ELEC_UNIT, color: '#f87171', fontSize: 11 }, lineStyle: { color: '#f87171', type: 'dashed' } }
+                                ]
+                            }
+                        }
+                    ]
+                };
+                chart.setOption(option);
+            });
+    }
+
+    // 初始化
+    {% if latest %}
+        {% set total_left = (latest.balance or 0) + (latest.subsidy or 0) %}
+        document.getElementById('balanceValue').textContent = '{{ "%.2f" | format(total_left) }}';
+        {% if latest.subsidy %}
+        document.getElementById('balanceBreakdown').textContent =
+            '购电 {{ "%.2f" | format(latest.balance) }} + 补助 {{ "%.2f" | format(latest.subsidy) }}';
+        {% endif %}
+        {% if daily_usage %}
+            document.getElementById('usageValue').textContent = '{{ daily_usage }}';
+            var daysLeft = Math.floor({{ total_left }} / {{ daily_usage }});
+            document.getElementById('daysValue').textContent = daysLeft > 0 ? daysLeft : '< 1';
+        {% endif %}
+        // 设置余额颜色
+        var bv = document.getElementById('balanceValue');
+        {% if latest.status == 'normal' %} bv.style.color = 'var(--accent-green)';
+        {% elif latest.status == 'warning' %} bv.style.color = 'var(--accent-yellow)';
+        {% elif latest.status == 'urgent' %} bv.style.color = 'var(--accent-orange)';
+        {% elif latest.status == 'critical' %} bv.style.color = 'var(--accent-red)';
+        {% else %} bv.style.color = 'var(--text-muted)';
+        {% endif %}
+    {% endif %}
+
+    loadChart(7);
+
+    // 窗口大小变化时重绘图表
+    window.addEventListener('resize', () => chart.resize());
+
+    // 切换宿舍
+    document.getElementById('roomSelect')?.addEventListener('change', function() {
+        window.location.href = '/?room=' + encodeURIComponent(this.value);
+    });
+
+    // 手动触发检查
+    document.getElementById('btnTrigger').addEventListener('click', function() {
+        var btn = this;
+        var status = document.getElementById('triggerStatus');
+        btn.disabled = true;
+        status.textContent = '查询中...';
+        fetch('/api/trigger', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                status.textContent = data.msg;
+                status.style.color = data.code === 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                setTimeout(() => location.reload(), 2000);
+            })
+            .finally(() => btn.disabled = false);
+    });
+
+    // 手动记录
+    document.getElementById('btnManual').addEventListener('click', function() {
+        var v = document.getElementById('manualBalance').value;
+        var status = document.getElementById('manualStatus');
+        if (!v) { status.textContent = '请先输入数字'; status.style.color = 'var(--accent-yellow)'; return; }
+        fetch('/api/manual_record', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ balance: parseFloat(v) })
+        })
+        .then(r => r.json())
+        .then(d => {
+            status.textContent = d.msg;
+            status.style.color = d.code === 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            if (d.code === 0) setTimeout(() => location.reload(), 1500);
+        });
+    });
+
+    // Flash 自动消失
+    setTimeout(() => document.querySelectorAll('.flash-msg').forEach(el => el.remove()), 3000);
+</script>
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}个人设置 - 宿舍电费监控{% endblock %}
+{% block content %}
+
+<!-- 侧边栏 -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+        <div>
+            <h5>电费监控</h5>
+            <small>Dorm Power Monitor</small>
+        </div>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="{{ url_for('index') }}" class="nav-item">
+            <i class="bi bi-grid-1x2-fill"></i> 监控面板
+        </a>
+        <a href="{{ url_for('settings') }}" class="nav-item active">
+            <i class="bi bi-gear-fill"></i> 个人设置
+        </a>
+        {% if current_user.role == 'admin' %}
+        <div class="nav-divider"></div>
+        <a href="{{ url_for('admin_users') }}" class="nav-item">
+            <i class="bi bi-people-fill"></i> 用户管理
+        </a>
+        <a href="{{ url_for('admin_config') }}" class="nav-item">
+            <i class="bi bi-sliders2"></i> 系统配置
+        </a>
+        <a href="{{ url_for('admin_logs') }}" class="nav-item">
+            <i class="bi bi-journal-text"></i> 抓取日志
+        </a>
+        {% endif %}
+    </nav>
+    <div class="sidebar-user">
+        <div class="avatar">{{ current_user.username[0] | upper }}</div>
+        <div class="user-info">
+            <div class="user-name">{{ current_user.username }}</div>
+            <div class="user-role">{{ '管理员' if current_user.role == 'admin' else '成员' }}</div>
+        </div>
+        <a href="{{ url_for('logout') }}" title="退出登录" style="color:var(--text-muted);font-size:18px;">
+            <i class="bi bi-box-arrow-right"></i>
+        </a>
+    </div>
+</aside>
+
+<div class="main-content">
+    <div class="topbar">
+        <h4><i class="bi bi-gear-fill me-2" style="color:var(--accent-blue)"></i>个人设置</h4>
+    </div>
+
+    <div class="content-area">
+        <div class="row g-4">
+            <!-- 基本信息设置 -->
+            <div class="col-lg-6">
+                <div class="card-dark">
+                    <h6 style="font-size:15px;font-weight:600;margin-bottom:20px;">
+                        <i class="bi bi-person-circle me-2" style="color:var(--accent-blue)"></i>基本信息
+                    </h6>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="profile">
+                        <div class="mb-3">
+                            <label class="form-label-dark">宿舍号</label>
+                            <input type="text" name="dorm_room" class="form-control form-control-dark"
+                                   value="{{ current_user.dorm_room or '' }}" placeholder="例如: 6-301" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label-dark">通知邮箱</label>
+                            <input type="email" name="email" class="form-control form-control-dark"
+                                   value="{{ current_user.email or '' }}" placeholder="用于接收邮件告警">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label-dark">Server酱 SendKey</label>
+                            <input type="text" name="serverchan_key" class="form-control form-control-dark"
+                                   value="{{ current_user.serverchan_key or '' }}" placeholder="SCT 开头的密钥">
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                                在 <a href="https://sct.ftqq.com" target="_blank" style="color:var(--accent-blue)">sct.ftqq.com</a>
+                                微信扫码登录后, 点「SendKey」复制粘贴到这里。免费版每天可推 5 条, 告警有去重足够用。
+                            </div>
+                        </div>
+                        <div class="mb-3 d-flex align-items-center justify-content-between"
+                             style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:8px;padding:10px 14px;">
+                            <div>
+                                <div style="font-size:13px;font-weight:500;">开机自动启动</div>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                                    登录 Windows 后自动后台运行监控, 不弹浏览器
+                                </div>
+                            </div>
+                            <button type="button" id="btnAutostart" class="btn btn-sm"
+                                    style="min-width:76px;border-radius:20px;font-size:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-muted);">
+                                加载中...
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <button type="button" id="btnTestNotify" class="btn btn-sm"
+                                    style="background:var(--bg-primary);color:var(--accent-green);border:1px solid rgba(52,211,153,.4);border-radius:8px;font-size:12px;">
+                                <i class="bi bi-send"></i> 发送测试通知
+                            </button>
+                            <span id="testNotifyStatus" style="font-size:12px;color:var(--text-muted);margin-left:8px;"></span>
+                        </div>
+                        <button type="submit" class="btn btn-primary-custom">保存设置</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 修改密码 -->
+            <div class="col-lg-6">
+                <div class="card-dark">
+                    <h6 style="font-size:15px;font-weight:600;margin-bottom:20px;">
+                        <i class="bi bi-shield-lock me-2" style="color:var(--accent-orange)"></i>修改登录密码
+                    </h6>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="password">
+                        <div class="mb-3">
+                            <label class="form-label-dark">原密码</label>
+                            <input type="password" name="old_password" class="form-control form-control-dark" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label-dark">新密码</label>
+                            <input type="password" name="new_password" class="form-control form-control-dark"
+                                   placeholder="至少 6 位" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary-custom">修改密码</button>
+                    </form>
+                </div>
+
+                <div class="card-dark mt-3">
+                    <h6 style="font-size:15px;font-weight:600;margin-bottom:20px;">
+                        <i class="bi bi-alipay me-2" style="color:var(--accent-blue)"></i>支付宝会话凭据
+                    </h6>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="alipay">
+                        <div class="mb-3">
+                            <label class="form-label-dark">支付宝用户ID (aliUserId)</label>
+                            <textarea name="alipay_token" class="form-control form-control-dark" rows="3"
+                                      placeholder="2088 开头的支付宝用户ID；点下方按钮打开配置工具，或手动填写">{{ current_user.alipay_token or config_ali_id or '' }}</textarea>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                                数据源：常工电控（建桥水电充值中心）。填好并保存后，系统即自动定时查询剩余购电+补助并按阈值告警。
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <button type="button" id="btnLaunchAuth" class="btn btn-sm"
+                                    style="background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.4);border-radius:8px;font-size:12px;">
+                                <i class="bi bi-key-fill"></i> 打开配置工具
+                            </button>
+                            <span id="authToolStatus" style="font-size:12px;color:var(--text-muted);"></span>
+                        </div>
+                        <button type="submit" class="btn btn-primary-custom">保存</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    setTimeout(() => document.querySelectorAll('.flash-msg').forEach(el => el.remove()), 3000);
+
+    // 开机自启开关
+    var autoBtn = document.getElementById('btnAutostart');
+
+    function renderAuto(enabled) {
+        autoBtn.textContent = enabled ? '已开启 ✓' : '已关闭';
+        autoBtn.style.background = enabled ? 'rgba(52,211,153,.15)' : 'var(--bg-card)';
+        autoBtn.style.color = enabled ? 'var(--accent-green)' : 'var(--text-muted)';
+        autoBtn.style.borderColor = enabled ? 'rgba(52,211,153,.4)' : 'var(--border-color)';
+    }
+
+    fetch('/api/autostart').then(r => r.json()).then(d => {
+        renderAuto(d.enabled);
+        if (d.msg && d.code === -1) autoBtn.title = d.msg;
+    });
+
+    autoBtn.addEventListener('click', function () {
+        var enabled = autoBtn.textContent.indexOf('已开启') === 0;
+        autoBtn.disabled = true;
+        fetch('/api/autostart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enable: !enabled })
+        })
+        .then(r => r.json())
+        .then(d => {
+            renderAuto(d.enabled);
+            if (d.msg) {
+                var s = document.getElementById('testNotifyStatus');
+                s.textContent = d.msg;
+                s.style.color = d.code === 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            }
+        })
+        .finally(() => autoBtn.disabled = false);
+    });
+
+    // 测试通知按钮: 先保存表单里的 SendKey 再发测试, 无需手动先点保存
+    document.getElementById('btnTestNotify')?.addEventListener('click', function () {
+        var status = document.getElementById('testNotifyStatus');
+        var keyInput = document.querySelector('input[name="serverchan_key"]');
+        status.textContent = '发送中...';
+        status.style.color = 'var(--text-muted)';
+        fetch('/api/test_notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: keyInput ? keyInput.value.trim() : '' })
+        })
+        .then(r => r.json())
+        .then(d => {
+            status.textContent = d.msg;
+            status.style.color = d.code === 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        });
+    });
+
+    // 启动 aliUserId 授权工具
+    document.getElementById('btnLaunchAuth')?.addEventListener('click', function () {
+        var btn = this;
+        var status = document.getElementById('authToolStatus');
+        btn.disabled = true;
+        status.textContent = '正在启动...';
+        status.style.color = 'var(--text-muted)';
+        fetch('/api/launch_auth_tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(d => {
+            status.textContent = d.msg || (d.code === 0 ? '已启动' : '启动失败');
+            status.style.color = d.code === 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        })
+        .catch(function() {
+            status.textContent = '请求失败';
+            status.style.color = 'var(--accent-red)';
+        })
+        .finally(function() {
+            btn.disabled = false;
+        });
+    });
+</script>
+{% endblock %}
